@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>仰望星空 (3-Player v10.33 Final)</title>
+    <style>
+        /* --- 全局与背景 --- */
+        body { 
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; 
+            margin: 0; padding: 0; height: 100vh; overflow: hidden;
+            user-select: none; color: #e2e8f0; 
+            background-image: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('bg.jpg');
+            background-size: cover; background-position: center bottom; background-repeat: no-repeat;
+            background-color: #0f172a; 
+        }
+        
+        #main-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 80px 1fr 360px; 
+            height: 100vh; gap: 15px; padding: 15px; box-sizing: border-box;
+            transition: filter 0.3s;
+        }
+
+        body.targeting-active #main-layout { filter: brightness(0.6) grayscale(0.3); }
+        body.targeting-active aside.panel {
+            filter: brightness(1.5) grayscale(0);
+            box-shadow: 0 0 30px rgba(249, 115, 22, 0.5);
+            z-index: 600; position: relative;
+            border: 2px solid rgba(249, 115, 22, 0.8);
+        }
+        body.targeting-active.mode-steal aside.panel { 
+            box-shadow: 0 0 30px rgba(168, 85, 247, 0.6); 
+            border-color: rgba(168, 85, 247, 0.8);
+        }
+
+        .panel { 
+            background: rgba(15, 23, 42, 0.85); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-radius: 16px; padding: 15px; 
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(12px);
+            display: flex; flex-direction: column; 
+        }
+
+        /* --- Header --- */
+        header { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; padding: 0 25px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .header-left { display: flex; flex-direction: column; }
+        h1 { margin: 0; font-size: 26px; color: #e2e8f0; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        
+        #epoch-display { 
+            font-size: 14px; color: #a5f3fc; margin-top: 5px; font-weight: bold; 
+            display: flex; align-items: center; gap: 10px;
+        }
+        .epoch-tag { background: rgba(8, 145, 178, 0.3); border: 1px solid #22d3ee; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; font-size: 11px; color: #22d3ee; }
+
+        .status-group { display: flex; gap: 15px; align-items: center; }
+        .status-badge { background: rgba(59, 130, 246, 0.8); color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; display: flex; align-items: center; border: 1px solid rgba(255,255,255,0.2); }
+        
+        #target-score-badge { background: linear-gradient(135deg, #10b981 0%, #047857 100%); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        #deck-count-badge { background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
+
+        /* --- Scoreboard --- */
+        aside { grid-row: 2 / -1; gap: 15px; overflow: hidden; }
+        #scoreboard-container { flex: 1; overflow-y: auto; }
+        #scoreboard table { width: 100%; border-collapse: separate; border-spacing: 0 5px; }
+        #scoreboard th { text-align: left; color: #94a3b8; padding: 5px; font-size: 12px; }
+        #scoreboard td { padding: 8px; background: rgba(255,255,255,0.05); vertical-align: middle; }
+        .active-row { border-left: 4px solid #facc15; background: linear-gradient(90deg, rgba(250, 204, 21, 0.1), transparent) !important; }
+
+        .combo-token { 
+            display: inline-block; background: #334155; padding: 3px 10px; border-radius: 6px; 
+            font-size: 11px; margin: 2px; border: 1px solid #475569; cursor: default; 
+            transition: all 0.2s; 
+        }
+        .token-Star { border-color: #facc15; color: #fef08a; background: rgba(250, 204, 21, 0.2); }
+        .token-Meteor { border-color: #38bdf8; color: #bae6fd; background: rgba(56, 189, 248, 0.2); }
+        .token-Moon { border-color: #94a3b8; color: #f8fafc; background: rgba(148, 163, 184, 0.2); }
+        .token-Nebula { border-color: #d8b4fe; color: #f5d0fe; background: rgba(192, 132, 252, 0.2); }
+        .token-Ultimate { border-color: #f43f5e; color: #fff; background: #be123c; border-width: 2px; box-shadow: 0 0 5px #f43f5e; font-weight: bold; }
+        
+        body.targeting-active .combo-token { opacity: 0.3; pointer-events: none; }
+        body.targeting-active .combo-token.targetable { 
+            opacity: 1; cursor: pointer; pointer-events: auto;
+            border-color: #f97316; background: #7c2d12; color: #fdba74; 
+            box-shadow: 0 0 10px #f97316; 
+            animation: breathe 0.8s infinite alternate;
+            font-weight: bold; transform: scale(1.1);
+        }
+        body.targeting-active.mode-steal .combo-token.targetable {
+            border-color: #d8b4fe; background: #581c87; color: #e9d5ff; 
+            box-shadow: 0 0 15px #a855f7;
+        }
+        body.targeting-active .combo-token.targetable:hover { transform: scale(1.3); filter: brightness(1.3); }
+
+        #game-log { height: 150px; background: rgba(0,0,0,0.6); color: #86efac; font-family: monospace; padding: 10px; border-radius: 8px; overflow-y: auto; font-size: 12px; border: 1px solid #334155; margin-bottom: 15px; }
+        #objective-hud { background: rgba(6, 78, 59, 0.6); border: 1px solid #10b981; padding: 10px; border-radius: 8px; font-size: 12px; color: #d1fae5; flex-shrink: 0; }
+
+        /* --- Game Center --- */
+        #game-center { 
+            grid-column: 2; grid-row: 2; 
+            position: relative; display: flex; flex-direction: column; justify-content: flex-start; gap: 20px; 
+            padding-top: 10px; 
+        }
+        
+        #opponents-area { display: flex; justify-content: space-around; width: 100%; margin-top: 10px; }
+        .opponent { text-align: center; opacity: 0.8; transition: all 0.3s; position: relative; min-width: 100px; padding: 10px; border-radius: 10px; }
+        .opponent.active { opacity: 1; transform: scale(1.1); background: rgba(255,255,255,0.05); box-shadow: 0 0 20px rgba(0,0,0,0.2); }
+        .opponent-avatar { width: 50px; height: 50px; background: #334155; border-radius: 50%; margin: 0 auto 5px; border: 2px solid #64748b; display: flex; justify-content: center; align-items: center; font-size: 20px; color:white; font-weight:bold; }
+
+        #draft-area { display:none; flex-direction: column; align-items: center; width: 100%; }
+        #draft-title { color:#facc15; font-size:24px; margin-bottom:5px; font-weight:bold; text-shadow:0 0 10px black; }
+        #draft-objective-hint { color:#22d3ee; font-size:16px; margin-bottom:20px; background:rgba(8, 145, 178, 0.2); padding:5px 20px; border-radius:20px; border:1px solid #22d3ee; }
+        
+        #draft-container { display:flex; justify-content:center; gap:10px; }
+        #draft-container .card { transform: scale(1.1); margin: 0 10px; }
+        #draft-container .card:hover { transform: scale(1.2) translateY(-10px); border-color: #10b981; box-shadow: 0 0 30px rgba(16, 185, 129, 0.5); }
+
+        /* --- Player Area --- */
+        #player-area { 
+            grid-column: 2; grid-row: 3; 
+            display: flex; flex-direction: column; 
+            height: 100%; 
+            position: relative; 
+            padding-bottom: 10px;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        
+        .card-container { 
+            flex: 1; 
+            display: flex; gap: 10px; justify-content: center; 
+            flex-wrap: wrap; 
+            overflow-y: auto; 
+            overflow-x: hidden;
+            align-content: flex-start;
+            width: 98%; 
+            margin: 0 auto; 
+            padding: 40px 10px 10px 10px; 
+        }
+        
+        .card-container::-webkit-scrollbar { width: 8px; }
+        .card-container::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .card-container::-webkit-scrollbar-track { background: transparent; }
+
+        .card {
+            width: 110px; height: 160px; 
+            border-radius: 10px;
+            background: #1e293b; border: 2px solid #475569;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            cursor: pointer; position: relative;
+            transition: transform 0.2s, border-color 0.2s;
+            overflow: hidden; display: flex; flex-direction: column;
+            flex-shrink: 0; 
+            margin-bottom: 10px; 
+        }
+        .card-img-box { width: 100%; height: 60%; background: #0f172a; position: relative; }
+        .card-img-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .card-info { width: 100%; height: 40%; background: rgba(30, 41, 59, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 5px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .card-name { font-size: 12px; font-weight: bold; color: #f1f5f9; margin-bottom: 2px; text-align:center; }
+        .card-desc { font-size: 9px; color: #94a3b8; text-align: center; line-height: 1.1; }
+
+        .card:hover { transform: translateY(-30px); border-color: #cbd5e1; z-index: 20; }
+        .card.selected { transform: translateY(-30px); border-color: #facc15; box-shadow: 0 0 20px rgba(250, 204, 21, 0.6); }
+        
+        .hand-dimmed .card { opacity: 0.5; filter: grayscale(0.5); cursor: not-allowed; }
+        .hand-dimmed .card:hover { transform: none; border-color: #475569; }
+
+        .btn-group { 
+            height: 60px;
+            flex-shrink: 0; 
+            display: flex; gap: 20px; z-index: 20; 
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        button { padding: 12px 50px; font-size: 18px; border: none; border-radius: 8px; cursor: pointer; background: #facc15; color: #0f172a; font-weight: bold; transition: background 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        button:hover { background: #eab308; transform: translateY(-2px); }
+        button:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+        button.secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+
+        /* --- Overlays --- */
+        #turn-curtain { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.98); z-index: 800; display: none; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
+        #curtain-msg { font-size: 40px; color: #facc15; margin-bottom: 20px; font-weight: bold; text-align: center; }
+        #curtain-sub { font-size: 20px; color: #cbd5e1; margin-bottom: 40px; }
+        .curtain-btn { font-size: 24px; padding: 20px 60px; border-radius: 50px; animation: pulse 2s infinite; cursor: pointer; background: linear-gradient(135deg, #facc15, #eab308); border:none; color:black; font-weight:bold; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 900; display: none; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(8px); }
+        .modal-content { background: #1e293b; padding: 40px; border-radius: 16px; border: 1px solid #475569; text-align: center; min-width: 600px; max-width: 90%; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .modal-choices { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+
+        #game-over-screen { display:none; position: fixed; top:0; left:0; width:100%; height:100%; z-index:300; flex-direction:column; justify-content:center; align-items:center; color:white; background: linear-gradient(rgba(15, 23, 42, 0.7), rgba(15, 23, 42, 0.95)), url('image_9.png'); background-size: cover; background-position: center; }
+        
+        #targeting-hud { 
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
+            z-index: 700; display: none; 
+            background: rgba(124, 45, 18, 0.9); border: 1px solid #f97316;
+            padding: 10px 40px; border-radius: 50px; 
+            color: #ffedd5; font-weight: bold; font-size: 18px;
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.4);
+            pointer-events: none; 
+        }
+        .hud-steal { 
+            background: rgba(88, 28, 135, 0.9) !important; 
+            border-color: #a855f7 !important; 
+            color: #f3e8ff !important; 
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4) !important; 
+        }
+        
+        @keyframes breathe { 0% { box-shadow: 0 0 5px #f97316; } 100% { box-shadow: 0 0 20px #f97316, 0 0 40px rgba(249, 115, 22, 0.5); } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div id="targeting-hud">⌖ 瞄准系统启动</div>
+
+<div id="turn-curtain">
+    <div id="curtain-msg">等待玩家操作</div>
+    <div id="curtain-sub">请将设备交给该玩家</div>
+    <button class="curtain-btn" onclick="hideCurtain()">我是该玩家，开始</button>
+</div>
+
+<div id="modal-window" class="modal-overlay">
+    <div class="modal-content">
+        <h2 id="modal-title" style="color:#facc15; font-size:28px; margin-bottom:20px;">标题</h2>
+        <p id="modal-desc" style="color:#cbd5e1; margin-bottom:30px; font-size:16px;">描述文字</p>
+        <div id="modal-body" class="modal-choices"></div>
+    </div>
+</div>
+
+<div id="game-over-screen">
+    <div id="game-over-content">
+        <h1 style="font-size: 60px; color: #facc15; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,0,0,0.5);">🌟 游戏结束 🌟</h1>
+        <div id="winner-name" style="font-size: 30px; color: #fff; margin-bottom: 20px; text-shadow: 0 0 10px rgba(0,0,0,0.5);">冠军: ???</div>
+        <div id="total-rounds-display" style="font-size: 20px; color: #a5f3fc; margin-bottom: 20px;"></div>
+        <div id="final-scores" style="text-align: left; background: rgba(15, 23, 42, 0.8); padding: 30px; border-radius: 16px; margin-bottom: 30px; min-width: 400px; max-height: 400px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1);"></div>
+        <button class="restart-btn" style="font-size:20px; padding:15px 40px; border-radius:50px; border:none; background:#facc15; font-weight:bold; cursor:pointer;" onclick="resetGame()">✨ 开启新的旅程</button>
+    </div>
+</div>
+
+<div id="main-layout">
+    <header>
+        <div class="header-left">
+            <h1>仰望星空 <span style="font-size:12px; opacity:0.6; letter-spacing:1px">v10.33 3-Player</span></h1>
+            <div id="epoch-display">
+                <span class="epoch-tag">当前纪元</span>
+                <span id="epoch-text" style="color:#fff;">Loading...</span>
+            </div>
+        </div>
+        <div class="status-group">
+            <div class="status-badge" id="round-badge">Round 1 / 6</div>
+            <div class="status-badge" id="target-score-badge">🎯 目标: 100分</div>
+            <div class="status-badge" id="deck-count-badge">🃏 牌库: 0</div>
+            <div class="status-badge badge-red" id="phase-badge">...</div>
+        </div>
+    </header>
+
+    <aside class="panel">
+        <h3 style="color:#facc15; margin-top:0; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">📊 战况统计</h3>
+        <div id="scoreboard-container">
+            <div id="scoreboard">
+                <table>
+                    <thead><tr><th>玩家</th><th>分数</th><th>组合</th></tr></thead>
+                    <tbody id="score-body"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div style="margin-top:10px; font-weight:bold; color:#94a3b8; font-size:12px">系统日志</div>
+        <div id="game-log"></div>
+
+        <div id="objective-hud">
+            <div class="hud-title">📜 你的目标</div>
+            <div id="objective-content">加载中...</div>
+        </div>
+    </aside>
+
+    <div id="game-center">
+        <div id="opponents-area"></div>
+        <div id="draft-area">
+            <div id="draft-title">🔄 轮抽阶段：请从上方选择一张牌拿走</div>
+            <div id="draft-objective-hint">你的目标: ???</div>
+            <div id="draft-container" class="card-container" style="justify-content:center;"></div>
+        </div>
+    </div>
+
+    <div id="player-area">
+        <div id="player-hand" class="card-container"></div>
+        <div class="btn-group" id="play-buttons">
+            <button onclick="attemptPlay()" id="btn-play">打出组合</button>
+            <button onclick="passTurn()" class="secondary" id="btn-pass">跳过回合</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* ================= 工具函数 ================= */
+    function log(m, isError=false) { 
+        const d = document.getElementById('game-log');
+        if(d) {
+            d.innerHTML += `<div style="${isError?'color:#ef4444;font-weight:bold':''}">< ${m}</div>`; 
+            d.scrollTop = d.scrollHeight;
+        } else {
+            console.log(m);
+        }
+    }
+
+    function createCardElement(c) {
+        const div = document.createElement('div');
+        div.className = `card ${c.selected?'selected':''}`;
+        const elFn = () => { 
+            if(state.gamePhase==='PLAY' && !state.targetingMode) { 
+                c.selected = !c.selected; 
+                updateUI(); 
+            } 
+        };
+        const imgSrc = c.img || 'event.jpg';
+        if(c.type === 'Objective' || c.type === 'Ultimate') {
+            div.innerHTML = `<div style="height:100%; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:10px; background:#0f172a;"><div style="font-size:30px; margin-bottom:10px;">📜</div><div style="font-weight:bold; color:#facc15; font-size:12px;">${c.name}</div><div style="font-size:10px; color:#cbd5e1; margin-top:5px;">${c.desc}</div></div>`;
+        } else {
+            div.innerHTML = `
+                <div class="card-img-box"><img src="${imgSrc}" onerror="this.src='bg.jpg'"></div>
+                <div class="card-info">
+                    <div class="card-name">${c.name}</div>
+                    <div class="card-desc">${c.desc||''}</div>
+                </div>`;
+        }
+        div.onclick = elFn;
+        return div;
+    }
+
+    function showModal(title, desc, choices, callback) {
+        const m = document.getElementById('modal-window');
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-desc').innerText = desc;
+        const body = document.getElementById('modal-body');
+        body.innerHTML = '';
+        choices.forEach((c, idx) => {
+            const el = createCardElement(c);
+            el.onclick = () => callback(idx);
+            body.appendChild(el);
+        });
+        m.style.display = 'flex';
+    }
+    function hideModal() { document.getElementById('modal-window').style.display = 'none'; }
+    
+    function showCurtain(nextPlayerId, reason) {
+        const curtain = document.getElementById('turn-curtain');
+        const msg = document.getElementById('curtain-msg');
+        const sub = document.getElementById('curtain-sub');
+        const btn = curtain.querySelector('button');
+        msg.innerText = `${state.players[nextPlayerId].name}`;
+        sub.innerText = reason || "请将设备交给该玩家";
+        btn.onclick = () => {
+            curtain.style.display = 'none';
+            if(state.gamePhase === 'DRAFT') { showDraftScreen(nextPlayerId); } else { updateUI(); checkTurn(); }
+        };
+        curtain.style.display = 'flex';
+    }
+    function hideCurtain() { document.getElementById('turn-curtain').style.display = 'none'; }
+
+    // Fisher-Yates Shuffle
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function updateUI() {
+        if(!state.players[state.currentPlayer]) return; 
+
+        document.getElementById('round-badge').innerText = `Round ${state.round} / ${state.maxRounds}`;
+        document.getElementById('phase-badge').innerText = state.gamePhase === 'DRAFT' ? '轮抽' : '出牌';
+        document.getElementById('deck-count-badge').innerText = `🃏 牌库: ${state.deck.length}`;
+        
+        // 强制界面切换
+        const draftArea = document.getElementById('draft-area');
+        const playerArea = document.getElementById('player-area');
+        const playButtons = document.getElementById('play-buttons');
+
+        if (state.gamePhase === 'DRAFT') {
+            draftArea.style.display = 'flex';
+            playerArea.style.display = 'flex'; 
+            playButtons.style.display = 'none';
+        } else {
+            draftArea.style.display = 'none';
+            playerArea.style.display = 'flex';
+            playButtons.style.display = 'flex';
+        }
+
+        const p = state.players[state.currentPlayer];
+        const hud = document.getElementById('objective-content');
+        let html = '';
+        if(p.objective) html += `<div class="hud-item"><strong style="color:#facc15">${p.objective.name}</strong><br>${p.objective.desc}</div>`;
+        p.ultimateObjs.forEach(u => { html += `<div class="hud-item"><strong style="color:#f472b6">${u.name}</strong><br>${u.desc}</div>`; });
+        hud.innerHTML = html || '无';
+
+        const handDiv = document.getElementById('player-hand');
+        handDiv.innerHTML = '';
+        p.hand.forEach(c => { handDiv.appendChild(createCardElement(c)); });
+
+        // Render Opponents
+        const oppArea = document.getElementById('opponents-area');
+        oppArea.innerHTML = '';
+        state.players.forEach(pl => {
+            if(pl.id !== state.currentPlayer) {
+                const isActive = (state.targetingAction === 'DISCARD_TARGET');
+                oppArea.innerHTML += `
+                    <div class="opponent" ${isActive ? `onclick="handleClickOpponent(${pl.id})"` : ''}>
+                        <div class="opponent-avatar">${pl.id + 1}</div>
+                        <div style="font-size:12px; color:#cbd5e1;">${pl.name}</div>
+                        <div style="font-size:16px; font-weight:bold; color:#facc15;">🎴 ${pl.hand.length}</div>
+                    </div>`;
+            }
+        });
+
+        const scoreBody = document.getElementById('score-body');
+        scoreBody.innerHTML = '';
+        state.players.forEach(pl => {
+            let indexedCombos = pl.combos.map((c, i) => ({...c, originalIndex: i}));
+            const typeOrder = {'Ultimate':0, 'Star':1, 'Meteor':2, 'Moon':3, 'Attack':4, 'Nebula':5};
+            indexedCombos.sort((a, b) => (typeOrder[a.type]||99) - (typeOrder[b.type]||99));
+
+            let comboHtml = indexedCombos.map((c) => {
+                const isTarget = state.targetingMode && pl.id !== state.currentPlayer; 
+                const isUltimate = c.type === 'Ultimate';
+                const selectable = isTarget && !isUltimate;
+                
+                let tokenClass = `token-${c.type}`;
+                return `<span class="combo-token ${tokenClass} ${selectable?'targetable':''}" ${selectable ? `onclick="handleClickDestroy(${pl.id}, ${c.originalIndex})"` : ''}>${c.name}</span>`;
+            }).join('');
+            
+            const activeClass = (pl.id === state.currentPlayer) ? 'active-row' : '';
+            scoreBody.innerHTML += `<tr class="${activeClass}"><td style="${activeClass?'color:#facc15;font-weight:bold':''}">${pl.name} ${pl.passed?'(Pass)':''}</td><td style="font-weight:bold; color:#facc15">${pl.score}</td><td>${comboHtml || '-'}</td></tr>`;
+        });
+    }
+
+    /* ================= 数据与状态 ================= */
+    // [修改] 恢复3人版卡牌数量
+    const CARD_DEFINITIONS = [
+        { type: 'Star', name: '星星', count: 11, score: 1, desc: '3张=星座(+6)', img: 'star.jpg' }, 
+        { type: 'Meteor', name: '流星', count: 8, score: 1, desc: '3张=许愿', img: 'meteor.jpg' }, 
+        { type: 'Meteorite', name: '陨石', count: 2, score: 0, desc: '配星星=摧毁', img: 'meteorite.jpg' },
+        { type: 'Astronaut', name: '太空人', count: 4, score: 1, desc: '配火箭=登月(+4)', img: 'astronaut.jpg' },
+        { type: 'Rocket', name: '火箭', count: 4, score: 1, desc: '配太空人=登月(+4)', img: 'rocket.jpg' },
+        { type: 'Nebula', name: '星云', count: 5, score: 1, desc: '2张=成长分', img: 'nebula.jpg' }, 
+        
+        { type: 'Event', name: '事件:星雨', count: 1, isEvent: true, effect: 'draw2', desc: '打出抽2张', img: 'image_2.png' },     
+        { type: 'Event', name: '事件:黑洞', count: 1, isEvent: true, effect: 'blackhole', desc: '手牌+弃牌重洗+分+摸牌', img: 'image_7.png' },   
+        { type: 'Event', name: '事件:流星雨', count: 1, isEvent: true, effect: 'meteorShower', desc: '配流星+弃牌=许愿', img: 'image_3.png' }, 
+        { type: 'Event', name: '事件:星辰闪耀', count: 1, isEvent: true, effect: 'starPower', desc: '配1星星=特殊效果', img: 'image_6.png' },  
+        { type: 'Event', name: '事件:摘星揽月', count: 1, isEvent: true, effect: 'drawRocket', desc: '保底抽1/火箭充能', img: 'image_5.png' }, 
+        { type: 'Event', name: '事件:小行星带', count: 1, isEvent: true, effect: 'mining', desc: '单出抽牌/组合夺取', img: 'image_4.png' } 
+    ];
+
+    const BASIC_OBJECTIVES = [
+        { name: '仙女座星系', desc: '3组流星 (+14分)', bonus: 14, check: (c)=>c.filter(x=>x.type==='Meteor').length>=3 },
+        { name: '蜂巢星系', desc: '3组星星 (+18分)', bonus: 18, check: (c)=>c.filter(x=>x.type==='Star').length>=3 },
+        { name: '漩涡星系', desc: '2星星+2流星 (+15分)', bonus: 15, check: (c)=>c.filter(x=>x.type==='Star').length>=2 && c.filter(x=>x.type==='Meteor').length>=2 },
+        { name: '触须星系', desc: '2陨石+2火箭 (+14分)', bonus: 14, check: (c)=>c.filter(x=>x.type==='Attack').length>=2 && c.filter(x=>x.type==='Moon').length>=2 },
+        { name: '车轮星系', desc: '1组星星+2组陨石打击 (+15分)', bonus: 15, check: (c)=>c.filter(x=>x.type==='Star').length>=1 && c.filter(x=>x.type==='Attack').length>=2 },
+        { name: '喷流星系', desc: '4组火箭 (+14分)', bonus: 14, check: (c)=>c.filter(x=>x.type==='Moon').length>=4 },
+        { name: '猎户星云', desc: '2流星+2火箭 (+16分)', bonus: 16, check: (c)=>c.filter(x=>x.type==='Meteor').length>=2 && c.filter(x=>x.type==='Moon').length>=2 },
+        { name: '草帽星系', desc: '2组流星+2组陨石 (+15分)', bonus: 15, check: (c)=>c.filter(x=>x.type==='Meteor').length>=2 && c.filter(x=>x.type==='Attack').length>=2 },
+        { name: '双子星系', desc: '2组星云+2组星星 (+16分)', bonus: 16, check: (c)=>c.filter(x=>x.type==='Nebula').length>=2 && c.filter(x=>x.type==='Star').length>=2 }
+    ];
+
+    const ULTIMATE_OBJECTIVES = [
+        { name: '河外丝状结构', desc: '3组星星, 2组流星, 1组陨石或火箭 (+35分)', bonus: 35, type: 'Ultimate' },
+        { name: '宇宙网', desc: '2组星星, 2组流星, 2组陨石, 2组火箭 (+40分)', bonus: 40, type: 'Ultimate' }
+    ];
+
+    const EPOCH_POOL = [
+        { id: 'GEMINI', name: '♊ 双子座相位', desc: '打出组合后若手牌为偶数，抽 1 张牌' },
+        { id: 'STARLIGHT', name: '✨ 星光璀璨', desc: '每打出一组组合，立即 +2 分' },
+        { id: 'DARK_FOREST', name: '🌲 黑暗森林', desc: '最后一位跳过回合的玩家扣分 (出牌越多扣越狠)' },
+        { id: 'TIME_FOLD', name: '⏳ 时空折叠', desc: '轮抽仅6张；本纪元内保留手牌不弃置' },
+        { id: 'ENTROPY', name: '🔥 熵增纪元', desc: '每回合送黑洞；黑洞弃牌分翻倍' },
+        { id: 'DISCOVERY', name: '🔭 大发现时代', desc: '你的回合开始时，若本轮未领补给，免费抽2张' } 
+    ];
+
+    let state = {
+        round: 1, maxRounds: 6, targetScore: 100, 
+        players: [], deck: [], discardPile: [], ultimateDeck: [], 
+        draftPacks: [], currentPlayer: 0, draftPlayerIdx: 0, draftRoundCount: 0,
+        passedPlayers: new Set(), gamePhase: 'INIT', targetingMode: false,
+        targetingAction: null,
+        objSelectionDeck: [], isProcessing: false,
+        activeEpochs: [], currentEpoch: null,
+        roundComboCount: 0 
+    };
+
+    /* ================= 核心逻辑 ================= */
+    
+    // [逻辑] 移除了即时胜利判定，只在回合结束检查
+
+    function initGame() {
+        try {
+            console.log(">>> 三人游戏初始化 (v10.33 Final)...");
+            state.deck = createDeck();
+            state.ultimateDeck = shuffle([...ULTIMATE_OBJECTIVES]); 
+            state.round = 1;
+            state.discardPile = [];
+            state.passedPlayers = new Set();
+            state.targetingMode = false;
+            state.isProcessing = false;
+            
+            state.activeEpochs = shuffle([...EPOCH_POOL]).slice(0, 3); 
+            updateEpoch();
+
+            // [修改] 3人初始化
+            state.players = [
+                { id: 0, name: "玩家 1", isHuman: true, hand: [], score: 0, combos: [], objective: null, ultimateObjs: [] },
+                { id: 1, name: "玩家 2", isHuman: true, hand: [], score: 0, combos: [], objective: null, ultimateObjs: [] },
+                { id: 2, name: "玩家 3", isHuman: true, hand: [], score: 0, combos: [], objective: null, ultimateObjs: [] }
+            ];
+
+            document.getElementById('game-over-screen').style.display = 'none';
+            state.objSelectionDeck = shuffle([...BASIC_OBJECTIVES]);
+            state.gamePhase = 'OBJ_SELECT';
+            
+            if(state.currentEpoch.id === 'ENTROPY') {
+                state.deck = state.deck.filter(c => c.effect !== 'blackhole');
+                log("🔥 熵增纪元：牌库中的黑洞已移除。");
+            }
+
+            log(">>> 游戏核心已加载，纪元系统就绪");
+            runObjectiveSelectionSequence(0);
+        } catch (e) {
+            log("初始化异常: " + e.message, true);
+            console.error(e);
+        }
+    }
+
+    function updateEpoch() {
+        let epochIdx = Math.floor((state.round - 1) / 2); 
+        if (epochIdx >= 3) epochIdx = 2;
+        state.currentEpoch = state.activeEpochs[epochIdx];
+        
+        const disp = document.getElementById('epoch-text');
+        if(state.currentEpoch && disp) {
+            disp.innerText = `${state.currentEpoch.name}: ${state.currentEpoch.desc}`;
+            log(`🌌 进入纪元: [${state.currentEpoch.name}]`);
+        }
+    }
+
+    function runObjectiveSelectionSequence(pid) {
+        if(pid >= state.players.length) { startRound(); return; }
+        showCurtain(pid, "准备选择初始目标");
+        const btn = document.querySelector('#turn-curtain .curtain-btn');
+        btn.onclick = () => {
+            hideCurtain();
+            const choice1 = state.objSelectionDeck.pop();
+            const choice2 = state.objSelectionDeck.pop();
+            showModal(`${state.players[pid].name}：请选择目标`, "选择一个作为你的初始秘密目标",
+                [choice1, choice2].map(c => ({...c, type:'Objective'})),
+                (idx) => {
+                    const selected = [choice1, choice2][idx];
+                    state.players[pid].objective = selected;
+                    hideModal();
+                    log(`${state.players[pid].name} 选择了初始目标。`);
+                    runObjectiveSelectionSequence(pid + 1);
+                }
+            );
+        };
+    }
+
+    function createDeck() {
+        let newDeck = [];
+        CARD_DEFINITIONS.forEach(def => {
+            for(let i=0; i<def.count; i++) newDeck.push({ ...def, uid: Math.random().toString(36).substr(2, 9), selected: false });
+        });
+        return shuffle(newDeck);
+    }
+
+    function startRound() {
+        if(state.round > state.maxRounds) { endGame(); return; }
+        updateEpoch(); 
+        
+        state.roundComboCount = 0; 
+        state.players.forEach(p => p.hasDrawnDiscovery = false);
+        
+        if(state.currentEpoch.id !== 'ENTROPY') {
+            state.deck = state.deck.filter(c => c.effect !== 'blackhole');
+            state.discardPile = state.discardPile.filter(c => c.effect !== 'blackhole');
+            state.players.forEach(p => {
+                p.hand = p.hand.filter(c => c.effect !== 'blackhole');
+            });
+            if (state.draftPacks) {
+                state.draftPacks.forEach(pack => {
+                    for(let i=pack.length-1; i>=0; i--) {
+                        if(pack[i].effect === 'blackhole') pack.splice(i, 1);
+                    }
+                });
+            }
+
+            const bhDef = CARD_DEFINITIONS.find(c => c.effect === 'blackhole');
+            if(bhDef) {
+                state.deck.push({ ...bhDef, uid: Math.random().toString(36).substr(2, 9), selected: false });
+            }
+            shuffle(state.deck);
+            log(`🧹 黑洞清理程序：已执行全域扫描，当前宇宙仅存 1 个黑洞。`);
+        } else if(state.currentEpoch.id === 'ENTROPY') {
+             state.deck = state.deck.filter(c => c.effect !== 'blackhole');
+             log("🔥 熵增纪元：移除了牌库中的黑洞。");
+        }
+
+        state.gamePhase = 'DRAFT';
+        state.passedPlayers.clear();
+        state.players.forEach(p => { p.passed = false; }); 
+        
+        const cardsToDraft = (state.currentEpoch.id === 'TIME_FOLD') ? 6 : 7;
+        log(`=== 第 ${state.round} 回合：轮抽开始 (本轮每人${cardsToDraft}张) ===`);
+        
+        state.draftPacks = []; 
+        for(let i=0; i<state.players.length; i++) { 
+            let pack = [];
+            for(let j=0; j<cardsToDraft; j++) { 
+                if(state.deck.length > 0) pack.push(state.deck.pop()); 
+            } 
+            state.draftPacks.push(pack);
+        }
+        
+        state.draftRoundCount = 0;
+        state.draftPlayerIdx = 0;
+        state.isProcessing = false;
+        
+        document.getElementById('draft-title').innerText = `🔄 轮抽阶段：请从上方选择一张牌拿走 (本轮共${cardsToDraft}张)`;
+        showCurtain(0, "准备开始轮抽");
+    }
+
+    function showDraftScreen(playerId) {
+        state.currentPlayer = playerId;
+        state.gamePhase = 'DRAFT';
+        
+        const currentPack = state.draftPacks[playerId];
+        if (currentPack.length === 1) {
+            handleDraftPick(playerId, 0); 
+            return; 
+        }
+
+        updateUI();
+        const draftArea = document.getElementById('draft-area');
+        const container = document.getElementById('draft-container');
+        draftArea.style.display = 'flex';
+        container.innerHTML = '';
+        
+        const p = state.players[playerId];
+        const objText = p.objective ? `📜 你的目标：${p.objective.name} (${p.objective.desc})` : "无目标";
+        document.getElementById('draft-objective-hint').innerText = objText;
+        
+        document.getElementById('player-area').style.display = 'flex';
+        document.getElementById('play-buttons').style.display = 'none';
+        document.getElementById('player-hand').classList.add('hand-dimmed');
+        
+        currentPack.forEach((card, idx) => {
+            const el = createCardElement(card);
+            el.onclick = () => handleDraftPick(playerId, idx);
+            container.appendChild(el);
+        });
+    }
+
+    function handleDraftPick(playerId, cardIdx) {
+        try {
+            if(state.isProcessing) return; 
+            
+            if(!state.draftPacks[playerId] || !state.draftPacks[playerId][cardIdx]) {
+                return;
+            }
+
+            const pack = state.draftPacks[playerId];
+            const pickedCard = pack.splice(cardIdx, 1)[0];
+            state.players[playerId].hand.push(pickedCard);
+            
+            state.draftPlayerIdx++;
+            
+            if(state.draftPlayerIdx < state.players.length) {
+                const nextPack = state.draftPacks[state.draftPlayerIdx];
+                if (nextPack.length === 1) {
+                    showDraftScreen(state.draftPlayerIdx);
+                } else {
+                    showCurtain(state.draftPlayerIdx, "继续轮抽");
+                }
+            } else {
+                state.draftPlayerIdx = 0;
+                state.draftRoundCount++;
+                const lastPack = state.draftPacks.pop();
+                state.draftPacks.unshift(lastPack);
+                
+                if(state.draftPacks[0].length === 0) {
+                    log("轮抽结束，进入出牌阶段！");
+                    state.gamePhase = 'PLAY'; 
+                    state.currentPlayer = 0;
+                    startPlayPhase();
+                } else {
+                    if (state.draftPacks[0].length === 1) {
+                        showDraftScreen(0);
+                    } else {
+                        showCurtain(0, "卡包已流转，继续选择");
+                    }
+                }
+            }
+        } catch (e) {
+            log("Draft Error: " + e.message, true);
+            console.error(e);
+        }
+    }
+
+    function startPlayPhase() {
+        state.gamePhase = 'PLAY';
+        
+        if(state.currentEpoch.id === 'ENTROPY') {
+            const bhDef = CARD_DEFINITIONS.find(c => c.effect === 'blackhole');
+            if(bhDef) {
+                state.players.forEach(p => {
+                    const newBH = { ...bhDef, uid: Math.random().toString(36).substr(2, 9), selected: false };
+                    p.hand.push(newBH);
+                });
+                log("🔥 熵增纪元：所有玩家已获得1张[黑洞]！");
+            }
+        }
+
+        showCurtain(0, "出牌阶段开始");
+        updateUI(); 
+    }
+
+    function checkTurn() {
+        if(state.passedPlayers.size === state.players.length) { endRoundLogic(); return; }
+        if(state.players[state.currentPlayer].passed) { nextTurn(); return; }
+        
+        state.isProcessing = false;
+        
+        // [调整] 大发现时代：每轮限一次
+        if(state.currentEpoch.id === 'DISCOVERY' && !state.players[state.currentPlayer].hasDrawnDiscovery) {
+             drawCards(state.currentPlayer, 2);
+             state.players[state.currentPlayer].hasDrawnDiscovery = true; 
+             log(`🔭 大发现时代：${state.players[state.currentPlayer].name} 获得了 2 张补给牌 (本轮一次)`);
+        }
+
+        updateUI(); 
+        document.getElementById('play-buttons').style.display = 'flex';
+        document.getElementById('player-hand').classList.remove('hand-dimmed');
+        document.getElementById('btn-play').disabled = false;
+        document.getElementById('btn-pass').disabled = false;
+    }
+
+    function lockUI() {
+        state.isProcessing = true;
+        document.getElementById('btn-play').disabled = true;
+        document.getElementById('btn-pass').disabled = true;
+    }
+
+    function attemptPlay() {
+        if(state.isProcessing) return;
+        
+        const hand = state.players[state.currentPlayer].hand;
+        const selected = hand.filter(c => c.selected);
+        if(selected.length === 0) return alert("请先选牌！");
+        const res = validateCombo(selected);
+        if(res.valid) {
+            if(res.reqDiscard) {
+                if(selected.length !== 3) return alert("【流星雨】需选择3张牌：流星雨+流星+弃牌");
+                if(!selected.some(c=>c.name.includes('流星雨')) || !selected.some(c=>c.type==='Meteor')) return alert("组合错误");
+            }
+            lockUI();
+            try {
+                executePlay(state.currentPlayer, selected, res);
+            } catch (e) {
+                log("Play Error: " + e.message, true);
+            }
+        } else { alert("❌ 无效组合: " + res.reason); }
+    }
+
+    function passTurn() {
+        if(state.isProcessing) return;
+        lockUI(); 
+        
+        const p = state.players[state.currentPlayer];
+        p.passed = true;
+        state.passedPlayers.add(state.currentPlayer);
+        p.hand.forEach(c=>c.selected=false);
+        
+        const isTimeFold = state.currentEpoch.id === 'TIME_FOLD';
+        const isEpochEnd = (state.round % 2 === 0);
+        
+        if(isTimeFold && !isEpochEnd) {
+            log(`⏳ 时空折叠：${p.name} 保留手牌到下回合。`);
+        } else {
+            log(`${p.name} 选择跳过剩余回合。`);
+        }
+        
+        if(state.passedPlayers.size === state.players.length) {
+            if(state.currentEpoch.id === 'DARK_FOREST') {
+                const penalty = state.roundComboCount * 2; 
+                p.score -= penalty;
+                p.darkForestPenalty = (p.darkForestPenalty || 0) + penalty; 
+                log(`🌲 黑暗森林法则：${p.name} 是最后一个暴露的！扣除 ${penalty} 分 (本回合共${state.roundComboCount}次行动)`);
+                alert(`🌲 黑暗森林结算：你最后跳过回合，扣除 ${penalty} 分！`);
+            }
+            endRoundLogic();
+            return;
+        }
+        
+        prepareNextTurn();
+    }
+
+    function nextTurn() {
+        const p = state.players[state.currentPlayer];
+        state.currentPlayer = (state.currentPlayer + 1) % state.players.length; 
+        checkTurn();
+    }
+    
+    function prepareNextTurn() {
+        if(state.passedPlayers.size >= state.players.length) {
+            endRoundLogic();
+            return;
+        }
+
+        let nextId = (state.currentPlayer + 1) % state.players.length; 
+        let loopCount = 0;
+        while(state.passedPlayers.has(nextId) && loopCount < state.players.length) { 
+            nextId = (nextId + 1) % state.players.length;
+            loopCount++;
+        }
+        
+        if(loopCount === state.players.length || (state.passedPlayers.size === state.players.length)) { 
+            endRoundLogic();
+        } else {
+            state.currentPlayer = nextId;
+            showCurtain(nextId, "轮到你的回合");
+        }
+    }
+
+    function checkTriggerGemini(pid) {
+        if(state.currentEpoch.id === 'GEMINI') {
+            const p = state.players[pid];
+            if (p.hand.length > 0 && p.hand.length % 2 === 0) {
+                drawCards(pid, 1);
+                log(`♊ 双子座相位：效果结算后手牌为偶数(${p.hand.length})，触发抽牌！`);
+                updateUI();
+            }
+        }
+    }
+
+    function validateCombo(cards) {
+        const types = cards.map(c => c.type);
+        const len = cards.length;
+        if(len === 1 && cards[0].isEvent) {
+            if(cards[0].effect === 'meteorShower') return {valid:false, reason:"流星雨需配合流星使用"};
+            if(cards[0].effect === 'starPower') return {valid:false, reason:"星辰闪耀需配合1张星星使用"}; 
+            return {valid:true, type:'Event', data:cards[0]};
+        }
+        
+        if(len===3 && types.every(t=>t==='Star')) return {valid:true, type:'Star', name:'星座组合', endScore:6};
+        if(len===3 && types.every(t=>t==='Meteor')) return {valid:true, type:'Meteor', name:'流星许愿', endScore:3};
+        if(len===2 && types.every(t=>t==='Nebula')) return {valid:true, type:'Nebula', name:'星云(成长)', endScore:0}; 
+        if(cards.some(c=>c.effect==='meteorShower') && len===3 && types.includes('Meteor') && types.includes('Event')) return {valid:true, type:'Meteor', name:'流星雨(事件)', endScore:3, reqDiscard:true};
+        if(len===2 && types.includes('Astronaut') && types.includes('Rocket')) return {valid:true, type:'Moon', name:'登月成功', endScore:4};
+        
+        if(len===2 && types.includes('Meteorite') && types.includes('Star')) return {valid:true, type:'Attack', name:'陨石打击', endScore:0};
+
+        if(len===2 && cards.some(c=>c.effect==='starPower') && cards.some(c=>c.type==='Star')) {
+            return {valid:true, type:'StarEvent', name:'星辰闪耀', endScore:0};
+        }
+        
+        if(len===4 && cards.some(c=>c.effect==='mining') && cards.filter(c=>c.type==='Meteorite').length===1 && cards.filter(c=>c.type==='Star').length===2) {
+            return {valid:true, type:'Steal', name:'引力捕获', endScore:0};
+        }
+
+        return {valid:false, reason:"不符合规则"};
+    }
+    
+    function enterTargetingMode() {
+        state.targetingMode = true;
+        document.body.classList.add('targeting-active');
+        document.getElementById('targeting-hud').style.display = 'block';
+        
+        const hud = document.getElementById('targeting-hud');
+        hud.className = ''; 
+        
+        if(state.targetingAction === 'STEAL') {
+            hud.classList.add('hud-steal');
+            hud.innerText = "⌖ 瞄准系统：请点击左侧记分板上对手的组合进行夺取";
+            document.body.classList.add('mode-steal');
+        } else if (state.targetingAction === 'DESTROY') {
+            hud.innerText = "⌖ 瞄准系统：请点击左侧记分板上对手的组合进行摧毁";
+        }
+        
+        updateUI();
+    }
+
+    function executePlay(pid, cards, combo) {
+        cards.forEach(c => c.selected = false);
+
+        const p = state.players[pid];
+        
+        if(state.currentEpoch.id === 'DARK_FOREST') {
+            state.roundComboCount++;
+        }
+
+        p.hand = p.hand.filter(h => !cards.some(c => c.uid === h.uid));
+        
+        let displayCards = [...cards];
+        if(combo.reqDiscard) {
+            const discard = cards.find(c => c.type !== 'Meteor' && c.effect !== 'meteorShower');
+            if(discard) { state.discardPile.push(discard); displayCards = cards.filter(c => c !== discard); }
+        }
+        
+        if (state.currentEpoch.id === 'STARLIGHT' && combo.type !== 'Steal' && combo.type !== 'Event') {
+            p.score += 2;
+            log("✨ 星光璀璨：组合打出，额外 +2 分！");
+        }
+
+        if(combo.type === 'Steal') {
+            cards.forEach(c => state.discardPile.push(c));
+            log(`${p.name} 发动 [引力捕获]！`);
+            const hasTargets = state.players.some(pl => pl.id !== pid && pl.combos.length > 0);
+            if(hasTargets) {
+                state.targetingAction = 'STEAL'; 
+                enterTargetingMode(); 
+                return; 
+            } else {
+                log("无目标，空放。");
+                checkTriggerGemini(pid);
+                updateUI(); prepareNextTurn(); return;
+            }
+        }
+
+        if(combo.type === 'StarEvent') {
+            state.discardPile.push(cards.find(c=>c.isEvent)); 
+            state.discardPile.push(cards.find(c=>c.type==='Star'));
+            log(`${p.name} 发动星辰闪耀！`);
+            
+            showModal(`${p.name} 的星辰闪耀`, "请选择效果", 
+                [
+                    {name:'星愿谐鸣', desc:'视为打出一组星座(+6分)', icon:'⭐', type:'Star', img:'star.jpg'},
+                    {name:'星之恩赐', desc:'现有每组星座抽1张牌', icon:'🃏', type:'Event', img:'image_6.png'}
+                ],
+                (idx) => {
+                    hideModal();
+                    if(idx === 0) {
+                        p.combos.push({ name: '星愿谐鸣', type: 'Star', endScore: 6, cards: [], round: state.round });
+                        p.score += 6; 
+                        log(">>> 召唤了 [星愿谐鸣] (+6分)");
+                    } else {
+                        const starCount = p.combos.filter(c => c.type === 'Star').length;
+                        if(starCount > 0) {
+                            drawCards(pid, starCount);
+                            log(`>>> 获得了星之恩赐，抽取 ${starCount} 张牌`);
+                        } else {
+                            log(">>> 星之恩赐失效：你当前没有星座组合。");
+                        }
+                    }
+                    checkTriggerGemini(pid); 
+                    updateUI();
+                    prepareNextTurn();
+                }
+            );
+            return;
+        }
+
+        if(combo.type === 'Event') {
+            state.discardPile.push(cards[0]);
+            log(`${p.name} 发动事件：${combo.data.name}`);
+            
+            if (combo.data.effect === 'drawRocket') {
+                showModal(`${p.name} 的摘星揽月`, "请选择效果", 
+                    [
+                        {name:'紧急补给', desc:'立即抽取 1 张牌', icon:'📦', type:'Event', img:'image_5.png'},
+                        {name:'火箭充能', desc:'每2组火箭抽1张(向上取整)', icon:'🚀', type:'Moon', img:'rocket.jpg'}
+                    ],
+                    (idx) => {
+                        hideModal();
+                        if(idx === 0) {
+                            drawCards(pid, 1);
+                            log("🪜 摘星揽月：选择了[紧急补给]，抽 1 张牌。");
+                        } else {
+                            const count = p.combos.filter(c => c.type === 'Moon').length;
+                            const extra = Math.ceil(count / 2);
+                            if(extra > 0) {
+                                drawCards(pid, extra);
+                                log(`🪜 摘星揽月：火箭充能生效 (拥有${count}组)，抽取 ${extra} 张牌！`);
+                            } else {
+                                drawCards(pid, 0); 
+                                log("🪜 摘星揽月：无火箭组合，充能失败 (抽0张)。");
+                            }
+                        }
+                        checkTriggerGemini(pid); 
+                        updateUI();
+                        prepareNextTurn();
+                    }
+                );
+                return; 
+            }
+
+            applyEventEffect(pid, combo.data.effect);
+        } else {
+            p.combos.push({ name: combo.name, type: combo.type, endScore: combo.endScore, cards: displayCards, round: state.round });
+            p.score += (combo.endScore || 0);
+            log(`${p.name} 打出 [${combo.name}]`);
+            
+            if(combo.type === 'Attack') { 
+                p.score += 1; 
+                const hasAnyCombos = state.players.some(pl => pl.id !== pid && pl.combos.length > 0);
+                if(hasAnyCombos) {
+                    state.targetingAction = 'DESTROY';
+                    enterTargetingMode(); 
+                    return; 
+                } else {
+                    log("无目标，陨石落空。");
+                    checkTriggerGemini(pid); 
+                    updateUI();
+                    prepareNextTurn();
+                    return;
+                }
+            }
+            if(combo.type === 'Moon') drawCards(pid, 1);
+            if(combo.type === 'Meteor') {
+                handleWish(pid);
+                return; 
+            }
+        }
+        
+        checkTriggerGemini(pid);
+        updateUI();
+        prepareNextTurn();
+    }
+    
+    function applyEventEffect(pid, effect) {
+        const p = state.players[pid];
+        if(effect === 'draw2') drawCards(pid, 2);
+        
+        if(effect === 'blackhole') {
+            const count = p.hand.length;
+            if(count > 0) {
+                p.hand.forEach(c => { c.selected = false; state.deck.push(c); });
+                p.hand = [];
+                
+                if(state.discardPile.length > 0) {
+                    const blackholes = state.discardPile.filter(c => c.effect === 'blackhole');
+                    const others = state.discardPile.filter(c => c.effect !== 'blackhole');
+                    others.forEach(c => { c.selected = false; state.deck.push(c); });
+                    state.discardPile = blackholes; 
+                    log("🕳️ 黑洞视界扩张：弃牌堆(除黑洞外)已被卷入！");
+                }
+
+                shuffle(state.deck);
+            }
+            const ptsPerCard = (state.currentEpoch.id === 'ENTROPY') ? 2 : 1;
+            const points = count * ptsPerCard;
+            p.score += points;
+            drawCards(pid, count + 2);
+            log(`🕳️ 黑洞：重塑宇宙！+${points}分，抽${count+2}张！`);
+        }
+        
+        if(effect === 'mining') {
+            drawCards(pid, 1);
+            log("⛏️ 深空开采：已完成资源开采，抽 1 张牌。");
+        }
+    }
+
+    function handleWish(pid) {
+        showModal(`${state.players[pid].name} 许愿`, "请选择愿望", 
+            [{name:'贪婪', desc:'抽 2 张', icon:'🃏'}, {name:'声望', desc:'+3 分', icon:'🏆'}, {name:'野心', desc:'抽终极目标', icon:'📜'}].map(x=>({...x, type:'Event'})),
+            (idx) => {
+                hideModal();
+                if(idx===0) { drawCards(pid, 2); log("许愿：抽了2张牌"); }
+                if(idx===1) { state.players[pid].score += 3; log("许愿：获得3分"); }
+                if(idx===2) {
+                    if(state.ultimateDeck.length > 0) {
+                        const ult = state.ultimateDeck.pop();
+                        state.players[pid].ultimateObjs.push(ult);
+                        state.players[pid].combos.push({name:'终极目标', type:'Ultimate', data:ult, endScore:0});
+                        alert(`获得：${ult.name}`);
+                    } else { alert("目标卡没了，补偿抽牌"); drawCards(pid, 2); }
+                }
+                
+                checkTriggerGemini(pid); 
+                updateUI();
+                prepareNextTurn(); 
+            }
+        );
+    }
+    
+    function drawCards(pid, num) { for(let i=0; i<num; i++) if(state.deck.length>0) state.players[pid].hand.push(state.deck.pop()); }
+
+    window.handleClickDestroy = function(targetPid, originalIndex) {
+        if(!state.targetingMode) return;
+        const targetP = state.players[targetPid];
+        const combo = targetP.combos[originalIndex];
+        
+        if(state.targetingAction === 'DISCARD_TARGET') return; 
+
+        if(combo.type === 'Ultimate') {
+            alert("⚠️ 警告：无法摧毁【终极目标】！");
+            return;
+        }
+
+        if(state.targetingAction === 'STEAL') {
+            if(confirm(`确认夺取 ${targetP.name} 的 [${combo.name}] ?`)) {
+                // [夺取] 对方扣分，我方加分
+                const stolen = targetP.combos.splice(originalIndex, 1)[0];
+                targetP.score -= (stolen.endScore || 0); 
+                
+                state.players[state.currentPlayer].combos.push(stolen);
+                state.players[state.currentPlayer].score += (stolen.endScore || 0); 
+                
+                log(`🧲 ${state.players[state.currentPlayer].name} 夺取了 ${targetP.name} 的组合`);
+                endTargeting();
+            }
+        } else if (state.targetingAction === 'DESTROY') {
+            if(confirm(`确认摧毁 ${targetP.name} 的 [${combo.name}] ?`)) {
+                // [摧毁] 对方扣分
+                targetP.combos.splice(originalIndex, 1);
+                targetP.score -= (combo.endScore || 0); 
+                
+                if(combo.cards) combo.cards.forEach(c => state.deck.unshift(c));
+                log(`💥 ${state.players[state.currentPlayer].name} 摧毁了 ${targetP.name} 的组合`);
+                endTargeting();
+            }
+        }
+    }
+    
+    function endTargeting() {
+        state.targetingMode = false;
+        state.gamePhase = 'PLAY';
+        state.targetingAction = null;
+        document.body.classList.remove('targeting-active');
+        document.body.classList.remove('mode-steal');
+        document.getElementById('targeting-hud').style.display = 'none';
+        
+        checkTriggerGemini(state.currentPlayer); 
+        updateUI();
+        prepareNextTurn();
+    }
+
+    function endRoundLogic() {
+        log(`=== 第 ${state.round} 回合结束 ===`);
+        let recycleBin = [...state.deck, ...state.discardPile];
+        
+        const isTimeFold = state.currentEpoch.id === 'TIME_FOLD';
+        const isEpochTransition = (state.round % 2 === 0);
+
+        state.players.forEach(p => {
+            if (isTimeFold && !isEpochTransition) {
+                log(`${p.name} 保留了 ${p.hand.length} 张手牌进入下回合 (不计基础分)`);
+                p.hand.forEach(c => c.selected = false);
+            } else {
+                const handScore = p.hand.reduce((s,c) => s+(c.score||0), 0);
+                p.score += handScore;
+                p.hand.forEach(c => c.selected = false);
+                recycleBin = recycleBin.concat(p.hand);
+                p.hand = [];
+            }
+            
+            p.combos.forEach(c => { 
+                if(c.cards) { c.cards.forEach(card => card.selected = false); recycleBin = recycleBin.concat(c.cards); }
+                c.cards = []; 
+            });
+        });
+        
+        recycleBin.forEach(c => c.selected = false);
+        state.deck = shuffle(recycleBin);
+        state.discardPile = [];
+        
+        let winnerFound = false;
+        state.players.forEach(p => {
+            if(calculateFinalScore(p).total >= state.targetScore) winnerFound = true;
+        });
+
+        if(winnerFound || state.round >= state.maxRounds) {
+            endGame();
+        } else {
+            state.round++;
+            startRound();
+        }
+    }
+
+    function calculateFinalScore(p) {
+        let comboScore = p.combos.reduce((sum, c) => sum + (c.endScore || 0), 0);
+        let baseScore = p.score - comboScore; 
+        
+        let nebulaScore = 0;
+        const nebulaCombos = p.combos.filter(c => c.type === 'Nebula').length;
+        if(nebulaCombos > 0) {
+            // [修复] n * (n + 2)
+            nebulaScore = nebulaCombos * (nebulaCombos + 2);
+        }
+        
+        let objBonus = 0;
+        if(p.objective && p.objective.check(p.combos)) {
+            objBonus = p.objective.bonus;
+        }
+        
+        let ultBonus = 0;
+        p.ultimateObjs.forEach(u => {
+             ultBonus += u.bonus; 
+        });
+        
+        const total = p.score + nebulaScore + objBonus + ultBonus;
+        
+        return { total, baseScore, comboScore, nebulaScore, objBonus, ultBonus };
+    }
+
+    function endGame() {
+        const screen = document.getElementById('game-over-screen');
+        const scoresDiv = document.getElementById('final-scores');
+        const winnerDiv = document.getElementById('winner-name');
+        
+        document.getElementById('total-rounds-display').innerText = `📅 历经回合: ${state.round}`;
+        
+        let html = '';
+        let highest = -999;
+        let winner = null;
+        
+        state.players.forEach(p => {
+            const res = calculateFinalScore(p);
+            if(res.total > highest) { highest = res.total; winner = p.name; }
+            html += `<div style="margin-bottom:15px; border-bottom:1px solid #555; padding-bottom:10px;">
+                <div style="font-size:24px; color:#facc15; font-weight:bold;">${p.name} <span style="float:right">${res.total}</span></div>
+                <div style="font-size:14px; color:#cbd5e1; margin-top:5px; line-height:1.6;">
+                    <div>基础分(手牌/事件): ${res.baseScore}</div>
+                    <div>组合分: ${res.comboScore}</div>
+                    ${res.nebulaScore > 0 ? `<div style="color:#d8b4fe">星云成长: +${res.nebulaScore}</div>` : ''}
+                    ${p.objective ? `<div>秘密目标: ${p.objective.name} (${res.objBonus>0 ? '<span style="color:#86efac">达成</span>' : '<span style="color:#ef4444">未达成</span>'}) +${res.objBonus}</div>` : ''}
+                    ${p.ultimateObjs.map(u => `<div style="color:#f472b6">终极目标: +${u.bonus}</div>`).join('')}
+                    ${p.darkForestPenalty ? `<div style="color:#ef4444">森林惩罚: -${p.darkForestPenalty}</div>` : ''}
+                </div>
+            </div>`;
+        });
+        
+        winnerDiv.innerText = `🏆 冠军: ${winner}`;
+        scoresDiv.innerHTML = html;
+        screen.style.display = 'flex';
+    }
+
+    function resetGame() {
+        document.getElementById('game-over-screen').style.display = 'none';
+        state.players = [];
+        state.deck = [];
+        state.discardPile = [];
+        state.passedPlayers = new Set();
+        state.activeEpochs = [];
+        state.currentEpoch = null;
+        initGame();
+    }
+
+    window.onload = initGame;
+</script>
+</body>
+</html>
